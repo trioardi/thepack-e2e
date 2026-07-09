@@ -1,9 +1,20 @@
 /**
  * @file A05-auth-edge-cases.spec.ts
- * @feature Authentication — negative / edge cases
+ * @module Authentication
+ * @feature Negative / edge cases
+ * @type Negative @priority High
  *
  * Covers the "edge case" explicitly requested by the brief (incorrect password /
  * empty fields) plus duplicate-account and weak-password validation.
+ *
+ * @preconditions
+ * - App running; a registered user exists for the login cases (fixture).
+ *
+ * @expectedResults
+ * - A05a wrong password  -> "Invalid credentials!", stays logged out
+ * - A05b empty fields    -> HTML5 validation blocks submit, no navigation
+ * - A05c duplicate email -> "User already exist!"
+ * - A05d weak password   -> "Please enter strong password!"
  */
 import { test, expect } from '../../support/fixtures';
 import { SignupPage } from '../../pages/SignupPage';

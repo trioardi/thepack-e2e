@@ -1,12 +1,21 @@
 /**
  * @file A01-signup.spec.ts
- * @feature Authentication — Sign up (happy path)
+ * @module Authentication
+ * @feature Sign up (happy path)
+ * @type Positive @priority High
+ *
+ * @preconditions
+ * - App is running; the email is not yet registered.
  *
  * @workflow
  * 1. Open the signup page
  * 2. Register a brand-new user with valid details
  * 3. Verify the app auto-logs-in and lands on the personalised Home page
  * 4. Verify the navbar reflects the authenticated user
+ *
+ * @expectedResults
+ * - Redirects to Home with the "Welcome Back, {name}" heading
+ * - The navbar shows the authenticated user's profile dropdown
  */
 import { test, expect } from '../../support/fixtures';
 import { SignupPage } from '../../pages/SignupPage';

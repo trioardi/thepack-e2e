@@ -1,11 +1,20 @@
 /**
  * @file E03-edit-delete-entry.spec.ts
- * @feature Journal Entries — Update + Delete (full CRUD lifecycle)
+ * @module Journal Entries
+ * @feature Update + Delete (full CRUD lifecycle)
+ * @type Positive @priority High
+ *
+ * @preconditions
+ * - A logged-in user with one seeded entry.
  *
  * @workflow
  * 1. Seed an entry and log in
  * 2. Edit its title + content, verify the card updates
  * 3. Delete the entry, verify it is removed from the list
+ *
+ * @expectedResults
+ * - "Entry updated successfully!" toast; card shows the new title + content, old title gone
+ * - "Entry deleted successfully!" toast; card removed from the list
  */
 import { test, expect } from '../../support/fixtures';
 import { uniqueEntry } from '../../support/data';

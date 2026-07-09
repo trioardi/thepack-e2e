@@ -11,6 +11,20 @@ Automated test suite for the **DayBook** MERN journaling app
 
 ---
 
+## Quick start (TL;DR)
+
+```bash
+# 1. Start the app under test (backend :3000 + frontend :5173) — see §2 for details
+# 2. Then, in this repo:
+npm install          # deps + Playwright Chromium
+npm test             # runs the API suite, then the E2E suite
+```
+
+Prefer to run one layer at a time? `npm run test:api` or `npm run test:e2e`.
+Full step-by-step (including how to launch DayBook) is below.
+
+---
+
 ## 1. Prerequisites
 
 - **Node.js** ≥ 18
@@ -109,3 +123,16 @@ daybook-qa-assessment/
   cookies over plain HTTP, so the API suite captures the `Set-Cookie` value and threads it manually.
 - **Confirmed backend bugs are encoded as `test.failing`** so the suite is green today and turns red the moment a bug
   is fixed — see [`docs/TEST-CASES.md` §4](docs/TEST-CASES.md).
+
+## 7. Troubleshooting
+
+| Symptom | Cause & fix |
+|---------|-------------|
+| API tests fail with `ECONNREFUSED` / `connect` errors | The DayBook **backend** is not running on `:3000`. Start it (§2) or set `BACKEND_URL`. |
+| E2E tests time out on the first navigation | The DayBook **frontend** is not running on `:5173`. Start it (§2) or set `FRONTEND_URL`. |
+| Backend logs `Database not connected!` | **MongoDB** is not reachable. Start Mongo (`docker run -p 27017:27017 mongo` or `mongod`) and restart the backend. |
+| `browserType.launch: Executable doesn't exist` | Playwright browser missing — run `npx playwright install chromium`. |
+| API suite fails right after a profile test | You may have triggered **BUG-01** (server crash). Restart the backend; the suite keeps that case `skip`-ped for exactly this reason. |
+
+> **Note:** the suite tests the DayBook app *as-is*. The 10 documented bugs are defects **in the application**, not in
+> the tests — the test suite itself is fully green (see [`docs/TEST-CASES.md`](docs/TEST-CASES.md) §5).

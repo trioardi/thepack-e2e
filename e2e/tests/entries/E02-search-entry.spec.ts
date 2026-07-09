@@ -1,6 +1,12 @@
 /**
  * @file E02-search-entry.spec.ts
- * @feature Journal Entries — Search
+ * @module Journal Entries
+ * @feature Search
+ * @type Positive @priority High
+ *
+ * @preconditions
+ * - A logged-in user with two seeded entries (Alpha…, Beta… whose content
+ *   contains the word "kangaroo").
  *
  * @workflow
  * 1. Seed two distinct entries for the user (API)
@@ -8,6 +14,11 @@
  * 3. Verify only the matching entry is shown
  * 4. Search by a term unique to the content of the second entry
  * 5. Verify the "no results" state for a non-existent term
+ *
+ * @expectedResults
+ * - Title search -> only Alpha is shown
+ * - Content-word search -> only Beta is shown
+ * - No-match search -> the friendly "couldn't find any entries" empty state
  */
 import { test, expect } from '../../support/fixtures';
 import { uniqueEntry } from '../../support/data';

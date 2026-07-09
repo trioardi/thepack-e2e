@@ -1,8 +1,17 @@
 /**
  * @file E04-entry-edge-cases.spec.ts
- * @feature Journal Entries — negative / edge cases
+ * @module Journal Entries
+ * @feature Negative / edge cases
+ * @type Negative @priority Medium
  *
  * Covers server-side length validation and client-side required-field guards.
+ *
+ * @preconditions
+ * - A logged-in user on /entries.
+ *
+ * @expectedResults
+ * - E04a title > 20 chars -> "Title length should not be more than 20 characters!"
+ * - E04b empty required fields -> HTML5 validation blocks submit, modal stays open
  */
 import { test, expect } from '../../support/fixtures';
 import { uniqueEntry } from '../../support/data';

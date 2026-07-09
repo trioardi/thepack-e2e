@@ -1,6 +1,11 @@
 /**
  * @file E01-create-entry.spec.ts
- * @feature Journal Entries — Create
+ * @module Journal Entries
+ * @feature Create
+ * @type Positive @priority High
+ *
+ * @preconditions
+ * - A logged-in user on /entries.
  *
  * @workflow
  * 1. Log in (authedPage fixture) and open /entries
@@ -8,6 +13,10 @@
  * 3. Verify the success toast
  * 4. Verify the entry is generated and rendered on the list with its title,
  *    mood and content
+ *
+ * @expectedResults
+ * - "Entry added successfully!" toast is shown
+ * - A new card appears with the correct mood + title heading and content
  */
 import { test, expect } from '../../support/fixtures';
 import { uniqueEntry } from '../../support/data';

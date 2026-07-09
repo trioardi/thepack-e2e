@@ -1,6 +1,11 @@
 /**
  * @file A02-login-logout.spec.ts
- * @feature Authentication — Login (happy path) + Logout
+ * @module Authentication
+ * @feature Login (happy path) + Logout
+ * @type Positive @priority High
+ *
+ * @preconditions
+ * - A registered user exists (seeded via API).
  *
  * @workflow
  * 1. Register a user (API seed)
@@ -8,6 +13,10 @@
  * 3. Verify authenticated Home + navbar state
  * 4. Log out via the profile dropdown
  * 5. Verify the session is cleared and the "Log In" CTA returns
+ *
+ * @expectedResults
+ * - Login lands on Home with the "Welcome Back, {name}" heading and profile dropdown
+ * - After logout the public "Log In" button reappears
  */
 import { test, expect } from '../../support/fixtures';
 

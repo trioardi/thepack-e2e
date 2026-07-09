@@ -1,6 +1,11 @@
 /**
  * @file A04-change-password.spec.ts
- * @feature Authentication — Change password
+ * @module Authentication
+ * @feature Change password
+ * @type Positive @priority High
+ *
+ * @preconditions
+ * - A logged-in user (authedPage fixture).
  *
  * @workflow
  * 1. Log in (authedPage fixture)
@@ -8,6 +13,11 @@
  * 3. Verify the success toast
  * 4. End-to-end proof: log out, then log back in with the NEW password
  * 5. Negative check: the OLD password is now rejected
+ *
+ * @expectedResults
+ * - "Password changed successfully!" toast is shown
+ * - Login with the new password succeeds
+ * - Login with the old password fails with "Invalid credentials!"
  */
 import { test, expect } from '../../support/fixtures';
 

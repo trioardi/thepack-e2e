@@ -1,6 +1,11 @@
 /**
  * @file A03-update-personal-details.spec.ts
- * @feature Authentication — Update personal details (profile)
+ * @module Authentication
+ * @feature Update personal details (profile)
+ * @type Positive @priority Medium
+ *
+ * @preconditions
+ * - A logged-in user (authedPage fixture).
  *
  * @workflow
  * 1. Log in (authedPage fixture)
@@ -9,9 +14,13 @@
  * 4. Verify the success toast confirms the update
  * 5. Verify persistence at the API level (GET /users/me reflects the new name)
  *
+ * @expectedResults
+ * - "Profile updated successfully!" toast is shown
+ * - GET /users/me returns the updated first + last name
+ *
  * @note We assert persistence via the API because the app does not refresh the
  *       Redux `user` state after a profile update, so the navbar name only
- *       changes after a re-login (tracked separately in the bug report).
+ *       changes after a re-login (tracked separately in the bug report, BUG-08).
  */
 import { test, expect } from '../../support/fixtures';
 import { authedApi } from '../../support/api';

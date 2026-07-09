@@ -14,7 +14,7 @@ change password, edge cases) and **Journal Entry CRUD + Search** — across both
 correctness/UX defects with reproducible evidence.
 
 ### 1.2 Test pyramid & tool choice
-I deliberately test each concern at the layer where it is cheapest and most reliable:
+Each concern is tested at the layer where it is cheapest and most reliable:
 
 | Layer | Tool | What it covers | Why |
 |-------|------|----------------|-----|
@@ -22,135 +22,315 @@ I deliberately test each concern at the layer where it is cheapest and most reli
 | **E2E / UI** | Playwright (TypeScript) | Real user journeys through the React UI against the live API | Confirms the wiring the user actually experiences |
 | **Exploratory** | Manual smoke + API probing | UI/UX inconsistencies, invalid input, crash cases | Finds what scripted tests assume away |
 
-This mirrors how I structure my day-to-day Playwright suites: page objects, per-test data isolation, accessible
-locators, and meaningful (content-level) assertions rather than "did the page load".
-
 ### 1.3 Design principles applied
-- **Test isolation** — every test provisions its own uniquely-named user/entry (timestamp + pid + random), so the suite
-  runs fully in parallel against a shared database with no cross-test coupling.
+- **Test isolation** — every test provisions its own uniquely-named user/entry (timestamp + process id + random), so
+  the suite runs fully in parallel against a shared database with no cross-test coupling.
 - **Arrange via API, assert via UI** — E2E specs seed prerequisite state through the API for speed, then drive and
   assert the behaviour under test through the UI.
 - **Meaningful assertions** — specs verify specific content (the created entry's title/mood/content, the exact error
   message, that the *new* password works and the *old* one is rejected) — not just navigation.
-- **Positive + negative coverage** — each feature has happy-path and edge-case cases (empty fields, wrong password,
-  duplicate account, weak password, over-length input, no-result search).
+- **Positive + negative coverage** — each feature has happy-path and edge-case cases.
 - **Executable bug documentation** — confirmed backend defects are encoded as `test.failing` cases so the suite stays
-  green today but automatically flags the day each bug is fixed (see §4).
+  green today but automatically flags the day each bug is fixed (see §5).
 
 ### 1.4 Scope
 **In scope:** all documented REST endpoints; signup/login/logout/profile/password UI flows; entry create/read/update/
 delete/search UI flows; input validation; auth/ownership boundaries.
-**Out of scope:** load/performance, security pen-testing, cross-browser matrix (suite is Chromium-first but
-browser-agnostic), visual regression, email delivery (app has none).
+**Out of scope:** load/performance, security pen-testing, cross-browser matrix (Chromium-first, browser-agnostic code),
+visual regression, email delivery (app has none).
+
+### 1.5 Test environment
+| Component | Value |
+|-----------|-------|
+| Frontend | React + Vite @ `http://localhost:5173` |
+| Backend | Node/Express @ `http://localhost:3000` |
+| Database | MongoDB (local / in-memory) |
+| Runner | Playwright 1.60 (Chromium), Jest 29 + Supertest 7, Node 18+ |
 
 ---
 
-## 2. E2E test cases (Playwright)
+## 2. Traceability matrix (summary)
 
-Location: [`e2e/tests`](../e2e/tests). Run: `npm run test:e2e`.
-
-| ID | Title | Type | Steps (abbreviated) | Expected result |
-|----|-------|------|---------------------|-----------------|
-| **A01** | Signup — happy path | Positive | Open /signup → register valid user | Auto-logged-in; Home greets "Welcome Back, {name}"; navbar shows profile |
-| **A02** | Login + Logout | Positive | Login with valid creds → logout via dropdown | Authenticated Home + navbar; after logout the "Log In" CTA returns |
-| **A03** | Update personal details | Positive | Profile → change first+last name → Save | Success toast; **GET /users/me confirms** the new name persisted |
-| **A04** | Change password | Positive/E2E | Change password → logout → login with new pw → try old pw | New password authenticates; **old password is rejected** ("Invalid credentials!") |
-| **A05a** | Login — incorrect password | Negative | Login with wrong password | "Invalid credentials!"; stays logged out on /login |
-| **A05b** | Login — empty fields | Negative | Submit empty login form | HTML5 validation blocks submit; field reported invalid; no navigation |
-| **A05c** | Signup — duplicate email | Negative | Sign up with an already-registered email | "User already exist!" |
-| **A05d** | Signup — weak password | Negative | Sign up with password `weak` | "Please enter strong password!" |
-| **E01** | Create entry | Positive | /entries → "+" → fill title/date/mood/content → Save | Success toast; card appears with correct **mood heading + content** |
-| **E02** | Search entries | Positive | Seed 2 entries → search by title, then by a content word, then a non-match | Only the matching card shows each time; non-match → friendly empty state |
-| **E03** | Edit + Delete entry | Positive/CRUD | Seed entry → edit title+content → delete | Card reflects the edit; original title gone; after delete the card is removed |
-| **E04a** | Entry — title > 20 chars | Negative | Create entry with a 33-char title | "Title length should not be more than 20 characters!" |
-| **E04b** | Entry — required fields | Negative | Open Add modal → Save empty | HTML5 validation blocks submit; modal stays open |
-
-**Total: 13 E2E tests — all passing.**
+| ID | Module | Title | Type | Priority | Status |
+|----|--------|-------|------|----------|--------|
+| A01 | Auth | Signup — happy path (auto-login) | Positive | High | ✅ Pass |
+| A02 | Auth | Login + Logout | Positive | High | ✅ Pass |
+| A03 | Auth | Update personal details | Positive | Medium | ✅ Pass |
+| A04 | Auth | Change password (old rejected / new accepted) | Positive | High | ✅ Pass |
+| A05a | Auth | Login with incorrect password | Negative | High | ✅ Pass |
+| A05b | Auth | Login with empty fields | Negative | Medium | ✅ Pass |
+| A05c | Auth | Signup with duplicate email | Negative | Medium | ✅ Pass |
+| A05d | Auth | Signup with weak password | Negative | Medium | ✅ Pass |
+| E01 | Entries | Create entry & verify on list | Positive | High | ✅ Pass |
+| E02 | Entries | Search by title & content (+ no-result) | Positive | High | ✅ Pass |
+| E03 | Entries | Edit & delete entry (CRUD lifecycle) | Positive | High | ✅ Pass |
+| E04a | Entries | Create entry — title > 20 chars | Negative | Medium | ✅ Pass |
+| E04b | Entries | Create entry — empty required fields | Negative | Medium | ✅ Pass |
+| API-* | API | 43 endpoint cases (see §4) | Pos/Neg | High | ✅ Pass |
+| BUG-* | Defects | 6 known-defect cases (see §5) | Defect | — | 🐞 Documented |
 
 ---
 
-## 3. API test cases (Jest + Supertest)
+## 3. Detailed E2E test cases (Playwright)
 
-Location: [`api/tests`](../api/tests). Run: `npm run test:api`.
-
-### 3.1 Authentication — `auth.api.test.ts`
-| Case | Request | Expected |
-|------|---------|----------|
-| Signup success | `POST /auth/signup` valid | **201**, profile returned (no password), auth cookie set |
-| Signup duplicate | existing email | **422** "User already exist!" |
-| Signup missing fields | no password | **400** "Fill all required fields!" |
-| Signup invalid email | `not-an-email` | **422** "Invalid email format!" |
-| Signup weak password | `weak` | **422** "Please enter strong password!" |
-| Login success | valid creds | **200** + cookie |
-| Login wrong password | bad password | **401** "Invalid credentials!" |
-| Login unknown user | no such email | **401** "Invalid credentials!" |
-| Logout | `POST /auth/logout` | **200** "Logout successfully!" |
-| Change pw success | valid old+new | **200**; new pw logs in, old pw fails |
-| Change pw no auth | no cookie | **401** |
-| Change pw missing field | only old | **400** |
-| Change pw wrong old | bad old | **401** "Old Password is incorrect!" |
-| Change pw same as old | new == old | **422** "New password must differ!" |
-| Change pw weak new | weak new | **422** |
-
-### 3.2 User profile — `users.api.test.ts`
-| Case | Request | Expected |
-|------|---------|----------|
-| Get profile | `GET /users/me` authed | **200**, correct email/first/last |
-| Get profile no auth | no cookie | **401** |
-| Update profile | `PUT /users/me` first+last | **200**; re-fetch confirms persistence |
-| Update missing first name | empty firstName | **422** "First name is required!" |
-| Update no auth | no cookie | **401** |
-
-### 3.3 Journal entries — `entries.api.test.ts`
-| Case | Request | Expected |
-|------|---------|----------|
-| Create entry | `POST /entries` valid | **201**, saved doc returned |
-| Create missing fields | no title | **422** |
-| Create invalid date | `date: not-a-date` | **422** |
-| Create title > 20 | long title | **422** |
-| Create content > 1500 | long content | **422** |
-| Create no auth | no cookie | **401** |
-| List entries | `GET /entries` | **200**, includes created entry |
-| Get by id | `GET /entries/:id` | **200**, correct doc |
-| Get missing (valid id) | non-existent id | **404** |
-| Get another user's entry | other owner | **404** (ownership isolation) |
-| Update entry | `PATCH /entries/:id` | **200**, fields updated |
-| Update missing | non-existent id | **404** |
-| Delete entry | `DELETE /entries/:id` | **200**; second delete → **404** |
-| Search by title | `?text=<title>` | **200**, match returned |
-| Search by content | `?text=<word in content>` | **200**, match returned |
-| Search no match | unknown text | **200** "No entries found!", empty array |
-| Search empty text | no `text` | **400** "Search text is required!" |
-| Search > 100 chars | 101-char text | **422** |
-
-**Total: 43 API tests passing + 1 skipped** (the destructive crash case, BUG-01).
+Location: [`e2e/tests`](../e2e/tests) · Run: `npm run test:e2e`
+Each case below maps 1:1 to a spec file. "Expected results" are the actual assertions in the code.
 
 ---
 
-## 4. Known-defect tests (executable bug documentation)
+### A01 — Signup (happy path)
+- **File:** `e2e/tests/auth/A01-signup.spec.ts` · **Type:** Positive · **Priority:** High
+- **Preconditions:** App running; the email is not yet registered.
+- **Test data:** Unique valid user — `firstName: Eric`, `lastName: Tester`, unique email, password `Passw0rd!` (meets strong-password rule).
+- **Steps:**
+  1. Navigate to `/signup`.
+  2. Fill First Name, Last Name, Email, Password.
+  3. Click **Sign up**.
+- **Expected results:**
+  - App auto-logs-in and redirects to Home (`/`).
+  - Home shows the heading **"Welcome Back, Eric"**.
+  - Navbar shows the profile dropdown trigger with the user's first name.
+
+---
+
+### A02 — Login + Logout
+- **File:** `e2e/tests/auth/A02-login-logout.spec.ts` · **Type:** Positive · **Priority:** High
+- **Preconditions:** A registered user exists (seeded via API).
+- **Test data:** The seeded user's email + password.
+- **Steps:**
+  1. Navigate to `/login` and log in with valid credentials.
+  2. Confirm authenticated state.
+  3. Open the navbar profile dropdown → **Log out** → confirm in the modal.
+- **Expected results:**
+  - Login redirects to Home with the **"Welcome Back, {name}"** heading and the profile dropdown visible.
+  - After logout, the public **"Log In"** button reappears (session cleared).
+
+---
+
+### A03 — Update personal details
+- **File:** `e2e/tests/auth/A03-update-personal-details.spec.ts` · **Type:** Positive · **Priority:** Medium
+- **Preconditions:** Logged-in user.
+- **Test data:** New name — `firstName: Erica`, `lastName: Updated`.
+- **Steps:**
+  1. Open navbar dropdown → **Profile**.
+  2. Change First Name and Last Name.
+  3. Click **Save Changes**.
+- **Expected results:**
+  - Success toast **"Profile updated successfully!"** is shown.
+  - `GET /api/users/me` confirms the profile persisted the new first + last name (server-side verification).
+
+---
+
+### A04 — Change password
+- **File:** `e2e/tests/auth/A04-change-password.spec.ts` · **Type:** Positive · **Priority:** High
+- **Preconditions:** Logged-in user.
+- **Test data:** Old password `Passw0rd!`, new password `NewPass9!`.
+- **Steps:**
+  1. Open navbar dropdown → **Change Password**.
+  2. Enter old + new password → **Change Password**.
+  3. Log out.
+  4. Log in with the **new** password.
+  5. Log out and attempt login with the **old** password.
+- **Expected results:**
+  - Success toast **"Password changed successfully!"**.
+  - Login with the **new** password succeeds (authenticated navbar).
+  - Login with the **old** password fails with **"Invalid credentials!"**.
+
+---
+
+### A05a — Login with an incorrect password
+- **File:** `e2e/tests/auth/A05-auth-edge-cases.spec.ts` · **Type:** Negative · **Priority:** High
+- **Preconditions:** A registered user exists.
+- **Test data:** Correct email + wrong password `WrongPass9!`.
+- **Steps:**
+  1. Navigate to `/login`, enter the email and the wrong password, submit.
+- **Expected results:**
+  - Error **"Invalid credentials!"** is shown.
+  - User remains logged out and stays on `/login`.
+
+---
+
+### A05b — Login with empty fields
+- **File:** `e2e/tests/auth/A05-auth-edge-cases.spec.ts` · **Type:** Negative · **Priority:** Medium
+- **Preconditions:** None.
+- **Test data:** Empty email + password.
+- **Steps:**
+  1. Navigate to `/login` and click **Log in** with both fields empty.
+- **Expected results:**
+  - HTML5 required-field validation blocks submission (email field reports `validity.valid === false`).
+  - No navigation occurs; the user stays on `/login`.
+
+---
+
+### A05c — Signup with a duplicate email
+- **File:** `e2e/tests/auth/A05-auth-edge-cases.spec.ts` · **Type:** Negative · **Priority:** Medium
+- **Preconditions:** A user is already registered with the target email.
+- **Test data:** New details but a reused email.
+- **Steps:**
+  1. Navigate to `/signup`, fill valid details using the already-registered email, submit.
+- **Expected results:**
+  - Error **"User already exist!"** is shown; no new account is created.
+
+---
+
+### A05d — Signup with a weak password
+- **File:** `e2e/tests/auth/A05-auth-edge-cases.spec.ts` · **Type:** Negative · **Priority:** Medium
+- **Preconditions:** None.
+- **Test data:** Valid details, password `weak`.
+- **Steps:**
+  1. Navigate to `/signup`, fill details with a weak password, submit.
+- **Expected results:**
+  - Error **"Please enter strong password!"** is shown; no account is created.
+
+---
+
+### E01 — Create a journal entry
+- **File:** `e2e/tests/entries/E01-create-entry.spec.ts` · **Type:** Positive · **Priority:** High
+- **Preconditions:** Logged-in user on `/entries`.
+- **Test data:** Unique title (≤20 chars), mood `🙂 Happy`, today's date, descriptive content.
+- **Steps:**
+  1. Click the floating **"+"** button.
+  2. Fill Title, Date, Mood, Content in the Add-entry modal.
+  3. Click **Save Entry**.
+- **Expected results:**
+  - Success toast **"Entry added successfully!"**.
+  - A new entry card is generated showing the **mood + title** in its heading and the entry content.
+
+---
+
+### E02 — Search entries by title and content
+- **File:** `e2e/tests/entries/E02-search-entry.spec.ts` · **Type:** Positive · **Priority:** High
+- **Preconditions:** Logged-in user with two seeded entries (`Alpha…` and `Beta…`, where Beta's content contains the word "kangaroo").
+- **Test data:** Search terms: the Alpha title, the word `kangaroo`, and `zzz-no-such-entry-zzz`.
+- **Steps:**
+  1. Search by the Alpha entry's title.
+  2. Search by `kangaroo` (a word that only appears in Beta's content).
+  3. Search by a term that matches nothing.
+- **Expected results:**
+  - Search by title → only the **Alpha** card is shown; Beta is absent.
+  - Search by content word → only the **Beta** card is shown; Alpha is absent.
+  - No-match search → the friendly empty state **"…couldn't find any entries matching your search query"** is shown.
+
+---
+
+### E03 — Edit and delete an entry (CRUD lifecycle)
+- **File:** `e2e/tests/entries/E03-edit-delete-entry.spec.ts` · **Type:** Positive · **Priority:** High
+- **Preconditions:** Logged-in user with one seeded entry.
+- **Test data:** New title `Edited…`, new content "Rewrote the whole day after some reflection."
+- **Steps:**
+  1. On the entry card, click the **edit** (pencil) icon.
+  2. Wait for the modal to hydrate, change Title + Content, click **Save Changes**.
+  3. On the updated card, click the **delete** (trash) icon → **Confirm**.
+- **Expected results:**
+  - Toast **"Entry updated successfully!"**; the card now shows the new title + content, and the old title is gone.
+  - Toast **"Entry deleted successfully!"**; the card is removed from the list.
+
+---
+
+### E04a — Create entry with a title longer than 20 characters
+- **File:** `e2e/tests/entries/E04-entry-edge-cases.spec.ts` · **Type:** Negative · **Priority:** Medium
+- **Preconditions:** Logged-in user on `/entries`.
+- **Test data:** 33-character title.
+- **Steps:**
+  1. Open the Add-entry modal, fill a >20-char title with otherwise valid fields, click **Save Entry**.
+- **Expected results:**
+  - Error **"Title length should not be more than 20 characters!"** is shown; no entry is created.
+
+---
+
+### E04b — Create entry with empty required fields
+- **File:** `e2e/tests/entries/E04-entry-edge-cases.spec.ts` · **Type:** Negative · **Priority:** Medium
+- **Preconditions:** Logged-in user on `/entries`.
+- **Test data:** All fields empty.
+- **Steps:**
+  1. Open the Add-entry modal and click **Save Entry** without filling anything.
+- **Expected results:**
+  - HTML5 required-field validation blocks submission (Title reports `validity.valid === false`); the modal stays open.
+
+---
+
+## 4. API test cases (Jest + Supertest)
+
+Location: [`api/tests`](../api/tests) · Run: `npm run test:api`
+Each row is one test case: the **Request** column is the step, the **Expected result** column is the assertion.
+
+### 4.1 Authentication — `auth.api.test.ts`
+| # | Request (step) | Expected result |
+|---|----------------|-----------------|
+| 1 | `POST /auth/signup` with valid data | **201**; profile returned (email/first/last), no password echoed; auth cookie set |
+| 2 | `POST /auth/signup` with an existing email | **422** "User already exist!" |
+| 3 | `POST /auth/signup` missing password | **400** "Fill all required fields!" |
+| 4 | `POST /auth/signup` with `not-an-email` | **422** "Invalid email format!" |
+| 5 | `POST /auth/signup` with password `weak` | **422** "Please enter strong password!" |
+| 6 | `POST /auth/login` with valid creds | **200** "User logged in successfully!"; cookie set |
+| 7 | `POST /auth/login` with wrong password | **401** "Invalid credentials!" |
+| 8 | `POST /auth/login` unknown user | **401** "Invalid credentials!" |
+| 9 | `POST /auth/logout` | **200** "Logout successfully!" |
+| 10 | `PUT /auth/change-password` valid old+new | **200**; new password logs in, old password → 401 |
+| 11 | `PUT /auth/change-password` no auth cookie | **401** |
+| 12 | `PUT /auth/change-password` only old provided | **400** "Both old and new passwords are required!" |
+| 13 | `PUT /auth/change-password` wrong old | **401** "Old Password is incorrect!" |
+| 14 | `PUT /auth/change-password` new == old | **422** "New password must differ!" |
+| 15 | `PUT /auth/change-password` weak new | **422** "Please enter strong password!" |
+
+### 4.2 User profile — `users.api.test.ts`
+| # | Request (step) | Expected result |
+|---|----------------|-----------------|
+| 1 | `GET /users/me` authenticated | **200**; correct email/first/last |
+| 2 | `GET /users/me` no cookie | **401** "No token found! Please log in and try again!" |
+| 3 | `PUT /users/me` with first+last | **200**; re-fetch confirms persistence |
+| 4 | `PUT /users/me` empty firstName | **422** "First name is required!" |
+| 5 | `PUT /users/me` no cookie | **401** |
+
+### 4.3 Journal entries — `entries.api.test.ts`
+| # | Request (step) | Expected result |
+|---|----------------|-----------------|
+| 1 | `POST /entries` valid | **201**; saved document returned |
+| 2 | `POST /entries` missing title | **422** "Please submit with required fields!" |
+| 3 | `POST /entries` `date: not-a-date` | **422** "Please provide a valid date!" |
+| 4 | `POST /entries` title > 20 chars | **422** "Title length should not be more than 20 characters!" |
+| 5 | `POST /entries` content > 1500 chars | **422** |
+| 6 | `POST /entries` no cookie | **401** |
+| 7 | `GET /entries` | **200**; array includes the created entry |
+| 8 | `GET /entries/:id` valid | **200**; correct document |
+| 9 | `GET /entries/:id` non-existent (well-formed id) | **404** |
+| 10 | `GET /entries/:id` for another user's entry | **404** (ownership isolation) |
+| 11 | `PATCH /entries/:id` valid | **200**; fields updated |
+| 12 | `PATCH /entries/:id` non-existent | **404** |
+| 13 | `DELETE /entries/:id` then delete again | **200**, then **404** |
+| 14 | `GET /entries/search?text=<title>` | **200**; match returned |
+| 15 | `GET /entries/search?text=<word in content>` | **200**; match returned |
+| 16 | `GET /entries/search?text=<no match>` | **200** "No entries found!"; empty array |
+| 17 | `GET /entries/search` (no text) | **400** "Search text is required!" |
+| 18 | `GET /entries/search?text=<101 chars>` | **422** |
+
+**API total: 43 tests passing + 1 skipped** (the destructive crash case, BUG-01).
+
+---
+
+## 5. Known-defect tests (executable bug documentation)
 
 Location: [`api/tests/known-issues.api.test.ts`](../api/tests/known-issues.api.test.ts).
 
 Confirmed backend defects are encoded as Jest **`test.failing`** cases that assert the *correct* expected behaviour.
 Because the app is currently buggy, these are reported **green** (the assertion is expected to fail). If a developer
-fixes the bug, the corresponding `test.failing` will start failing loudly — a built-in regression alarm that the bug is
-gone and the assertion should be promoted to a normal test. The one exception is **BUG-01**, which is `test.skip`
-because executing it crashes the shared server; its full repro lives in the test file and the bug report.
+fixes the bug, the corresponding `test.failing` starts failing loudly — a built-in regression alarm. **BUG-01** is
+`test.skip` because running it crashes the shared server; its full repro lives in the test file and the bug report.
 
-| Test | Maps to | Current | Correct |
-|------|---------|---------|---------|
+| Test | Maps to | Current behaviour | Correct behaviour |
+|------|---------|-------------------|-------------------|
 | signup without email | BUG-02 | 500 | 400 |
 | login empty body | BUG-03 | 500 | 400 |
 | get entry malformed id | BUG-04 | 500 | 4xx |
 | search regex metachar `(` | BUG-05 | 500 | < 500 |
 | create entry invalid mood | BUG-06 | 500 | 422 |
-| update profile w/o lastName | BUG-01 | **crash** | ≤ 4xx (skipped) |
+| update profile w/o lastName | BUG-01 | **process crash** | ≤ 4xx (skipped) |
 
 Full analysis, severity and fixes: [`docs/BUG-REPORT.md`](./BUG-REPORT.md).
 
 ---
 
-## 5. Results summary
+## 6. Results summary
 
 | Suite | Tests | Result |
 |-------|-------|--------|
